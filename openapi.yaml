@@ -1,0 +1,178 @@
+openapi: 3.0.3
+info:
+  title: PHP Financial Observer MCP API
+  version: "1.0.0"
+  description: |
+    API HTTP esposta dal server MCP PHP 8.4 per monitorare stato, panoramica dei mercati,
+    principali ETF e singoli titoli/ETF tramite simbolo. Usa le API pubbliche di Financial Modeling Prep (piano demo).
+servers:
+  - url: http://localhost:8080
+    description: Server di sviluppo PHP interno
+paths:
+  /health:
+    get:
+      summary: Stato del server MCP
+      tags: [System]
+      responses:
+        '200':
+          description: Stato del server
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /api/markets/overview:
+    get:
+      summary: Panoramica degli indici globali
+      tags: [Markets]
+      responses:
+        '200':
+          description: Lista di indici azionari globali
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketOverviewResponse'
+        '502':
+          $ref: '#/components/responses/UpstreamError'
+  /api/etf/top-movers:
+    get:
+      summary: Principali ETF per variazione
+      tags: [ETFs]
+      parameters:
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+          description: Numero massimo di ETF da restituire (1-100)
+      responses:
+        '200':
+          description: Lista di ETF ordinati per performance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EtfMoversResponse'
+        '502':
+          $ref: '#/components/responses/UpstreamError'
+  /api/quotes/{symbol}:
+    get:
+      summary: Dati di un titolo o ETF specifico
+      tags: [Quotes]
+      parameters:
+        - in: path
+          name: symbol
+          required: true
+          schema:
+            type: string
+          description: Simbolo del titolo/ETF (es. AAPL, SPY)
+      responses:
+        '200':
+          description: Quote del simbolo richiesto
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuoteResponse'
+        '404':
+          description: Simbolo non trovato o senza dati
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          $ref: '#/components/responses/UpstreamError'
+components:
+  responses:
+    UpstreamError:
+      description: Errore nel recupero dati dall'API esterna
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        timestamp:
+          type: string
+          format: date-time
+      required: [status, timestamp]
+    MarketQuote:
+      type: object
+      description: Dati sintetici di un indice di mercato.
+      properties:
+        symbol:
+          type: string
+          example: '^GSPC'
+        name:
+          type: string
+          example: S&P 500
+        price:
+          type: number
+          format: float
+          example: 5223.23
+        change:
+          type: number
+          format: float
+          example: -15.42
+        changesPercentage:
+          type: number
+          format: float
+          example: -0.29
+        timestamp:
+          type: integer
+          description: Timestamp UNIX del dato
+      required: [symbol]
+      additionalProperties: true
+    MarketOverviewResponse:
+      type: array
+      items:
+        $ref: '#/components/schemas/MarketQuote'
+    EtfQuote:
+      type: object
+      description: Quote di un ETF.
+      properties:
+        symbol:
+          type: string
+          example: SPY
+        name:
+          type: string
+          example: SPDR S&P 500 ETF Trust
+        price:
+          type: number
+          format: float
+          example: 520.12
+        change:
+          type: number
+          format: float
+          example: 2.15
+        changesPercentage:
+          type: number
+          format: float
+          example: 0.41
+        volume:
+          type: number
+          example: 54321000
+      required: [symbol]
+      additionalProperties: true
+    EtfMoversResponse:
+      type: array
+      items:
+        $ref: '#/components/schemas/EtfQuote'
+    QuoteResponse:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/EtfQuote'
+      description: Quote per il simbolo richiesto.
+      additionalProperties: true
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Symbol not found or no data available.
+      required: [error]
